@@ -56,49 +56,68 @@ get.bca.alphas <- function(data, est, boot.est, alpha, func){
   return(alphas)
 }
 
-non.par.bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
-                           method = 'percentile', forlp = FALSE){
+bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
+                      method = 'percentile', parametric = FALSE,
+                      dist.func = NULL){
   # purpose : produces a 1 - alpha % confidence interval for the 'func' of the
   #           data, using a non-parametric bootstrap of n samples of size 'size'
   #
-  # inputs  : data   - numeric vector of observations from a univariate 
-  #                    distribution
-  #           n      - the number of resamples to perform for the bootstrap
-  #           alpha  - a number between 0 and 1, such that a 1-alpha %
-  #                    confidence interval will be produced
-  #           func   - function to be used to calculate the statistic of
-  #                    interest for each sample. The default is 'mean'. 
-  #           method - 'percentile' or 'bca'. Specifies the method to be used to 
-  #                    obtain the quantiles to sample from to obtain the
-  #                    interval
-  #           forlp  - default is FALSE. When TRUE, the function uses a for 
-  #                    loop to conduct the bootstrap. This functionality was 
-  #                    added in so that we could verify that the non-loop 
-  #                    version was in fact faster. 
+  # inputs  : data       - numeric vector of observations from a univariate 
+  #                        distribution
+  #           n          - the number of resamples to perform for the bootstrap
+  #           alpha      - a number between 0 and 1, such that a 1-alpha %
+  #                        confidence interval will be produced
+  #           func       - function to be used to calculate the statistic of
+  #                        interest for each sample. The default is 'mean'. 
+  #           method     - 'percentile' or 'bca'. Specifies the method to be
+  #                        used to obtain the quantiles to sample from to obtain
+  #                        the interval
+  #           parametric - Logical ; indicating if the resamples should be 
+  #                        taken from a given distribution or resampled from 
+  #                        the data
+  #           dist.func  - function to sample the data from when parametric is 
+  #                        set to TRUE. It is assumed that the first argument
+  #                        in any call to dist.func is the number of random
+  #                        deviates to be produced, as is the convention with
+  #                        rnorm, runif, rpois, rgamma, etc.
+  #           ...        - extra optional parameters to be passed to dist.func
   #          
   # output  : named vector containing the lower and upper bounds of the interval
   
   # Input checks and setting default values: 
   if (class(data)!='numeric' & class(data)!='integer'){
     stop('input data must be numeric')}
-
+  
+  if (class(parametric)!='logical') stop('parametric must be TRUE or FALSE')
+  if ((parametric & is.null(dist.func))|(parametric & !is.function(dist.func))){
+    stop('when parametric is set to TRUE a dist.func function must be provided')
+  }
+  
   if (n%%1!=0 | n<1) stop('n must be a positive integer')
   if (alpha<0 | alpha>1) stop('alpha must be between 0 and 1')
   func <- match.fun(func) # to allow the user to pass in the func or func name
   if (!is.function(func)) stop('invalid function supplied as func argument')
   if (!method %in% c('percentile','BCa')) stop('invalid method')
   
-  samples <- non.parametric.sample(data, n)       # generate the random samples
-  samples <- cbind(samples,data)                  # add in the observed data
-  samples <- apply(samples,2,func)                # calculate statistics
+  ### End of input-checks
   
+  if (!parametric){  # generate the random samples with replacement
+    samples <- replicate(n, sample(x=data, size=length(data),replace=T))  
+  }
+  
+  else{ # parametric resamples
+    samples <- replicate(n, dist.func(length(data),...))
+  }
+  
+  samples <- cbind(samples,data)                # add in the observed data
+  samples <- apply(samples,2,func)              # calculate statistics
   lower <- alpha/2      # percentile method
   upper <- 1 - alpha/2  # intervals
   
   if (method=='BCa'){
     alphas <- get.bca.alphas(data, func(data), samples, alpha, func)
-    lower <- alphas[1]
-    upper <- alphas[2]
+    lower  <- alphas[1]
+    upper  <- alphas[2]
     }
   
   CI <- quantile(samples, probs=c(lower, upper))
