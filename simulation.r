@@ -11,7 +11,9 @@ non.parametric.sample <- function(data, n){
   #
   # output  : size*n dimension matrix. Each column is a generated sample.
   
-  if (class(data)!='numeric') stop('input data must be numeric')
+  if (class(data)!='numeric' & class(data)!='integer'){
+    stop('input data must be numeric')}
+  
   if (n%%1!=0 | n<1) stop('n must be a positive integer')
   
   return(replicate(n, sample(x=data, size=length(data),replace=T)))
@@ -55,7 +57,7 @@ get.bca.alphas <- function(data, est, boot.est, alpha, func){
 }
 
 non.par.bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
-                           method = 'percentile'){
+                           method = 'percentile', forlp = FALSE){
   # purpose : produces a 1 - alpha % confidence interval for the 'func' of the
   #           data, using a non-parametric bootstrap of n samples of size 'size'
   #
@@ -69,12 +71,17 @@ non.par.bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   #           method - 'percentile' or 'bca'. Specifies the method to be used to 
   #                    obtain the quantiles to sample from to obtain the
   #                    interval
+  #           forlp  - default is FALSE. When TRUE, the function uses a for 
+  #                    loop to conduct the bootstrap. This functionality was 
+  #                    added in so that we could verify that the non-loop 
+  #                    version was in fact faster. 
   #          
   # output  : named vector containing the lower and upper bounds of the interval
   
   # Input checks and setting default values: 
-  if (class(data)!='numeric') stop('input data must be numeric')
-  size <- length(data) 
+  if (class(data)!='numeric' & class(data)!='integer'){
+    stop('input data must be numeric')}
+
   if (n%%1!=0 | n<1) stop('n must be a positive integer')
   if (alpha<0 | alpha>1) stop('alpha must be between 0 and 1')
   func <- match.fun(func) # to allow the user to pass in the func or func name
@@ -98,5 +105,139 @@ non.par.bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   return(CI)
 }
 
-D <- rnorm(100)
-non.par.bootstrap(D,method='BCa')
+simulation <-  function(dist.func, simulations, sample.n, boot.n, boot.method,
+                        stat.func, alpha, ...){
+  # purpose : run a set of simulations
+  #
+  # inputs  : dist.func   - The function which should be used to generate the 
+  #                         random data used at the start of each simulation
+  #           simulations - The number of simulations to run ; how many
+  #                         bootstraps should be produced for each setting?
+  #           sample.n    - The sample size to be used every time a sample is
+  #                         generated using dist.func. Can be a vector.
+  #           boot.n      - The number of resamples each bootstrap should
+  #                         perform in order to produce its interval. Can be a
+  #                         vector
+  #           boot.method - 'percentile' or 'BCa' as a character input. Can be
+  #                         a vector
+  #           stat.func   - The function which calculates the statistic of
+  #                         interest for which we are producing a confidence 
+  #                         interval for
+  #           alpha       - We produce (1-alpha)*100 % confidence intervals
+  #           ...         - Extra parameters to be passed to dist.func
+  # 
+  # output : a multi-dimensional array with named dimensions, containing all of 
+  #          the statistics produced by the simulated intervals. Has class 
+  #          'simulation.output.object'
+  
+  # generate the multi-dimensional array which will store all of the generated 
+  output <- array(data = NA, # intervals
+                  dim = c(length(sample.n), length(boot.n),length(boot.method),
+                          2*simulations),
+                  dimnames = list(paste('sample.n:',as.character(sample.n)),
+                                  paste('boot.n:',as.character(boot.n)),
+                                  paste('boot.method:',boot.method))
+                  )
+  
+  for (sample.n.setting in sample.n){
+    for (boot.n.setting in boot.n){
+      for (boot.method.setting in boot.method){
+        
+        sample.n.index <-  which(sample.n==sample.n.setting) # extract indices
+        boot.n.index <- which(boot.n==boot.n.setting)        # of settings
+        boot.method.index <- which(boot.method==boot.method.setting)
+        
+        sims <- matrix(nrow=2, ncol=simulations)
+        
+        for (i in 1:simulations){
+          dataset <- dist.func(sample.n.setting, ...) # get the original sample
+          
+          # get the bootstrap interval for that dataset:
+          boot <-  non.par.bootstrap(dataset,n=boot.n.setting,
+                                    alpha=alpha,func = stat.func,
+                                    method = boot.method.setting)
+          
+          # add the bootstrap to the matrix of results:
+          sims[,i] <- boot
+        }
+
+        # add the set of simulated bootstrap intervals to the output array:
+        output[sample.n.index, boot.n.index, boot.method.index,] <-  sims
+      }
+    }
+  }
+  class(output) <- 'simulation.output.object'
+  return(output)
+}
+
+calculate.summaries <- function(simulation.output.object, true.value){
+  # purpose : takes as input a simulation.output.object and the true.value of 
+  #           the statistic for the distribution used to produce the deviates
+  #           and calculates some summaries (coverage, length etc.) using the
+  #           simulation results contained in the simulation.output.object
+  #
+  # inputs  : simulation.output.object - the result of calling the function 
+  #           'simulation' which is a multi-dimensional array containing 
+  #           all the simulated bootstrap intervals at each level of the 
+  #           simulation settings
+  #
+  # output  : a simulation.summaries object, it is simply a
+  #           simulation.output.object with the 4th dimension of the array 
+  #           representing the various summaries we have calculated for those
+  #           simuation settings
+  
+  if (class(simulation.output.object)!='simulation.output.object'){
+    stop('input must be a valid simulation.output.object')
+  }
+  
+  if (class(true.value)!='numeric') stop('true.value must be a real number')
+  
+  
+}
+
+get.coverage <- function(bootstrap.results, true.value){
+  # purpose : returns the observed coverage, given a vector which contains
+  #           a sequence of confidence intervals
+  #
+  # input   : bootstrap.results - a vector containing bootstrap intervals in the
+  #           format c(lower1, upper1, lower2, upper2, etc.)
+  #
+  # output  : numeric scalar ; the observed coverage given the vector of
+  #           bootstrap intervals
+  
+  if ( class(bootstrap.results)!='numeric' | class(true.value)!='numeric'){
+    stop('invalid input')}
+  
+  n = length(bootstrap.results)
+  if (n%%2!=0) stop('input of odd length is not allowed')
+  
+  lowers <- bootstrap.results[seq(1,n,2)] # we split our intervals into
+  uppers <- bootstrap.results[seq(2,n,2)] # vectors of lower and upper bounds
+  
+  # is the true.value contained in each of our confidence intervals? :
+  in.interval <- (true.value>=lowers & true.value<=uppers)
+  
+  return(sum(in.interval)/(n/2)) # return the observed coverage
+}
+
+get.length <- function(bootstrap.results, true.value){
+  # purpose : returns the observed average interval length, given a vector which
+  #           contains a sequence of confidence intervals
+  #
+  # input   : bootstrap.results - a vector containing bootstrap intervals in the
+  #           format c(lower1, upper1, lower2, upper2, etc.)
+  #
+  # output  : numeric scalar ; the observed average interval length given the
+  #           vector of bootstrap intervals
+  
+  if ( class(bootstrap.results)!='numeric' | class(true.value)!='numeric'){
+    stop('invalid input')}
+  
+  n = length(bootstrap.results)
+  if (n%%2!=0) stop('input of odd length is not allowed')
+  
+  lowers <- bootstrap.results[seq(1,n,2)] # we split our intervals into
+  uppers <- bootstrap.results[seq(2,n,2)] # vectors of lower and upper bounds
+  
+  return(mean(abs(uppers-lowers)))# return the estimated average interval length
+}
