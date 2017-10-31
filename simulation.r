@@ -220,7 +220,7 @@ get.coverage <- function(bootstrap.results, true.value){
   return(sum(in.interval)/(n/2)) # return the observed coverage
 }
 
-get.length <- function(bootstrap.results, true.value){
+get.length <- function(bootstrap.results){
   # purpose : returns the observed average interval length, given a vector which
   #           contains a sequence of confidence intervals
   #
@@ -230,8 +230,7 @@ get.length <- function(bootstrap.results, true.value){
   # output  : numeric scalar ; the observed average interval length given the
   #           vector of bootstrap intervals
   
-  if ( class(bootstrap.results)!='numeric' | class(true.value)!='numeric'){
-    stop('invalid input')}
+  if ( class(bootstrap.results)!='numeric') stop('invalid input')
   
   n = length(bootstrap.results)
   if (n%%2!=0) stop('input of odd length is not allowed')
