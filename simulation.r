@@ -106,7 +106,7 @@ non.par.bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
 }
 
 simulation <-  function(dist.func, simulations, sample.n, boot.n, boot.method,
-                        stat.func, alpha, ...){
+                        stat.func=mean, alpha=0.05, ...){
   # purpose : run a set of simulations
   #
   # inputs  : dist.func   - The function which should be used to generate the 

@@ -7,8 +7,7 @@ norm.sim <- simulation(dist.func=rnorm,
                        sample.n=c(10,50,100,500,1000),
                        boot.n=c(9,19,29,99,199,499,999),
                        boot.method=c('percentile','BCa'),
-                       stat.func=mean,
-                       alpha=0.05)
+                       stat.func=mean)
 
 poisson.sim <- simulation(dist.func=rpois,
                           simulations=500,
@@ -16,5 +15,4 @@ poisson.sim <- simulation(dist.func=rpois,
                           boot.n=c(9,19,29,99,199,499,999),
                           boot.method=c('percentile','BCa'),
                           stat.func=mean,
-                          alpha=0.05,
                           lambda=10)
