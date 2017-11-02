@@ -57,8 +57,8 @@ get.bca.alphas <- function(data, est, boot.est, alpha, func){
 }
 
 bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
-                      method = 'percentile', parametric = FALSE,
-                      dist.func = NULL){
+                      method = 'percentile', smooth.sd = 0.2, 
+                      dist.func = NULL, ...){
   # purpose : produces a 1 - alpha % confidence interval for the 'func' of the
   #           data, using a non-parametric bootstrap of n samples of size 'size'
   #
@@ -69,12 +69,20 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   #                        confidence interval will be produced
   #           func       - function to be used to calculate the statistic of
   #                        interest for each sample. The default is 'mean'. 
-  #           method     - 'percentile' or 'bca'. Specifies the method to be
-  #                        used to obtain the quantiles to sample from to obtain
-  #                        the interval
-  #           parametric - Logical ; indicating if the resamples should be 
-  #                        taken from a given distribution or resampled from 
-  #                        the data
+  #           method     - 'percentile', 'BCa', 'parametric' or 'smooth'.
+  #                        Specifies the bootstrap method to be used. When
+  #                        'parametric' is chosen, the percentile method is used
+  #                        to calculate the confidence interval using the
+  #                        bootstrap samples, and a function from which to
+  #                        sample the data must be specified. All remaining 
+  #                        options produce non-parametric bootstraps. Option
+  #                        'smooth' adds a normal noise centred at 0. The
+  #                        chosen standard deviation is a fraction of the sample
+  #                        sd. This is set using the parameter 'smooth.sd'.
+  #           smooth.sd  - Multiplier for the sample standard deviation. When 
+  #                        method = 'smooth', a normal noise id added to 
+  #                        each bootstrap resample. It has mean 0 and standard
+  #                        deviation smooth.sd * sd(data).
   #           dist.func  - function to sample the data from when parametric is 
   #                        set to TRUE. It is assumed that the first argument
   #                        in any call to dist.func is the number of random
@@ -85,28 +93,45 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   # output  : named vector containing the lower and upper bounds of the interval
   
   # Input checks and setting default values: 
+  if(!is.null(dist.func)) dist.func <- match.fun(dist.func)
   if (class(data)!='numeric' & class(data)!='integer'){
     stop('input data must be numeric')}
   
-  if (class(parametric)!='logical') stop('parametric must be TRUE or FALSE')
-  if ((parametric & is.null(dist.func))|(parametric & !is.function(dist.func))){
+  if ((method=='parametric' & is.null(dist.func))|
+      (method=='parametric' & !is.function(dist.func))){
     stop('when parametric is set to TRUE a dist.func function must be provided')
   }
   
-  if (n%%1!=0 | n<1) stop('n must be a positive integer')
+  if (method=='smooth' & (class(smooth.sd)!='numeric' | smooth.sd<=0 |
+                          length(smooth.sd)>1 )){
+    
+    stop('When method = \'smooth\', smooth.sd must be a positive scalar')
+  }
+  
+  if (n%%1!=0 | n<2) stop('n must be a positive integer greater than 1')
   if (alpha<0 | alpha>1) stop('alpha must be between 0 and 1')
   func <- match.fun(func) # to allow the user to pass in the func or func name
   if (!is.function(func)) stop('invalid function supplied as func argument')
-  if (!method %in% c('percentile','BCa')) stop('invalid method')
+  if (!method %in% c('percentile','BCa','parametric','smooth')){
+    stop('invalid method')}
   
   ### End of input-checks
   
-  if (!parametric){  # generate the random samples with replacement
-    samples <- replicate(n, sample(x=data, size=length(data),replace=T))  
+  if (method!='parametric'){  # generate the random samples with replacement
+    samples <- replicate(n, sample(x=data, size=length(data),replace=T)) 
+    
+    if (method=='smooth'){ # add noise to the data for a smooth bootstrap
+      noise <- replicate(n, rnorm(length(data), sd = sd(data)*smooth.sd))
+      samples <- samples + noise
+    }
+    
   }
   
   else{ # parametric resamples
-    samples <- replicate(n, dist.func(length(data),...))
+    # the replicate function worked badly with functions like rpois and rt, 
+    # so a less efficient method has to be used to produce parametric samples:
+    samples <- matrix(nrow=length(data),ncol=n)
+    for (i in 1:n){samples[,i] <- dist.func(length(data),...)}
   }
   
   samples <- cbind(samples,data)                # add in the observed data
@@ -125,8 +150,8 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
 }
 
 simulation <-  function(dist.func, simulations, sample.n, boot.n, boot.method,
-                        stat.func=mean, alpha=0.05, ...){
-  # purpose : run a set of simulations
+                        stat.func=mean, alpha=0.05, smooth.sd=0.2,...){
+  # purpose : run a set of simulations with different settings.
   #
   # inputs  : dist.func   - The function which should be used to generate the 
   #                         random data used at the start of each simulation
@@ -137,20 +162,25 @@ simulation <-  function(dist.func, simulations, sample.n, boot.n, boot.method,
   #           boot.n      - The number of resamples each bootstrap should
   #                         perform in order to produce its interval. Can be a
   #                         vector
-  #           boot.method - 'percentile' or 'BCa' as a character input. Can be
-  #                         a vector
+  #           boot.method - 'percentile', 'BCa', 'smooth' or 'parametric' as a
+  #                         character input. Can be a vector
   #           stat.func   - The function which calculates the statistic of
   #                         interest for which we are producing a confidence 
   #                         interval for
   #           alpha       - We produce (1-alpha)*100 % confidence intervals
+  #           smooth.sd   - What fraction of the sample sd should the sd of the
+  #                         noise added to the data have for a smooth bootstrap?
   #           ...         - Extra parameters to be passed to dist.func
   # 
   # output : a multi-dimensional array with named dimensions, containing all of 
   #          the statistics produced by the simulated intervals. Has class 
   #          'simulation.output.object'
   
+  ### note:
+  ### we don't type check inputs since the bootstrap function will do it for us.
+  
   # generate the multi-dimensional array which will store all of the generated 
-  output <- array(data = NA, # intervals
+  output <- array(data = NA,                                       # intervals
                   dim = c(length(sample.n), length(boot.n),length(boot.method),
                           2*simulations),
                   dimnames = list(paste('sample.n:',as.character(sample.n)),
@@ -172,9 +202,11 @@ simulation <-  function(dist.func, simulations, sample.n, boot.n, boot.method,
           dataset <- dist.func(sample.n.setting, ...) # get the original sample
           
           # get the bootstrap interval for that dataset:
-          boot <-  non.par.bootstrap(dataset,n=boot.n.setting,
-                                    alpha=alpha,func = stat.func,
-                                    method = boot.method.setting)
+          boot <-  bootstrap(dataset, n=boot.n.setting, alpha=alpha,
+                             func = stat.func,
+                             method = boot.method.setting,
+                             smooth.sd = smooth.sd,
+                             dist.func = dist.func, ...)
           
           # add the bootstrap to the matrix of results:
           sims[,i] <- boot
