@@ -360,7 +360,4 @@ plot.simulation.summary.object <- function(simulation.summary.object,
   legend('topright',
          method.names, 
          lty=1, col=seq(1,dims[3]), bty='n', cex=.75)
-  
-  
 }
-
