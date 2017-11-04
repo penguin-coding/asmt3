@@ -102,7 +102,7 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
     stop('when parametric is set to TRUE a dist.func function must be provided')
   }
   
-  if (method=='smooth' & (class(smooth.sd)!='numeric' | smooth.sd<=0 |
+  if (method=='smooth' & (class(smooth.sd)!='numeric' | smooth.sd<0 |
                           length(smooth.sd)>1 )){
     
     stop('When method = \'smooth\', smooth.sd must be a positive scalar')
@@ -116,6 +116,7 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
     stop('invalid method')}
   
   ### End of input-checks
+  if (smooth.sd==0 & method=='smooth') method <- 'percentile'
   
   if (method!='parametric'){  # generate the random samples with replacement
     samples <- replicate(n, sample(x=data, size=length(data),replace=T)) 
@@ -243,7 +244,28 @@ calculate.summaries <- function(simulation.output.object, true.value){
   
   if (class(true.value)!='numeric') stop('true.value must be a real number')
   
+  dims <- dim(simulation.output.object)
   
+  output <- array(dim = c(dims[1],dims[2],dims[3],2))
+  dimnames(output) <- dimnames(simulation.output.object)
+  for (i in 1:dims[1]){     # With nested for loops, go through the 
+    for(j in 1:dims[2]){    # simulated bootstrap intervals and calculate
+      for(k in 1:dims[3]){  # the summary statistics of interest:
+        
+        boot.ints <- simulation.output.object[i,j,k,]  # extract intervals
+        
+        coverage <- get.coverage(boot.ints,true.value) # calculate the
+        length <- get.length(boot.ints)                # statistics
+         
+        summaries <- c(coverage,length)                # add them to the 
+        names(summaries) <- c('coverage','length')     # output object with
+        output[i,j,k,] <- summaries                    # appropriate names
+      }
+    }
+  }
+  
+  class(output) <- 'simulation.summary.object'
+  return(output)
 }
 
 get.coverage <- function(bootstrap.results, true.value){
@@ -291,3 +313,54 @@ get.length <- function(bootstrap.results){
   
   return(mean(abs(uppers-lowers)))# return the estimated average interval length
 }
+
+plot.simulation.summary.object <- function(simulation.summary.object,
+                                           statistic='coverage'){
+  # purpose : plots the statistic of interest for a set of simulation
+  #           bootstrap confidence intervals, for all levels of 'factor'. Fixes
+  #           the other setting values at their highest setting i.e. uses the 
+  #           the largest sample size and bootstrap resamples available.
+  #
+  # inputs  : simulation.summary.object - array of summary statistics for 
+  #                                       simulation intervals.
+  #           statistic                 - summary statistic of interest, 
+  #                                       'coverage', 'length'
+  # output  : None, produces a plot. 
+  
+  if (class(simulation.summary.object)!='simulation.summary.object'){
+    stop('invalid input type')}
+  
+  if ( !(statistic %in% c('coverage','length')) ){
+    stop('invalid choice of statistic')}
+  
+  # fetch summary statistic index:
+  ifelse(statistic=='coverage', stat.ind <- 1, stat.ind <- 2) 
+  
+  dims <- dim(simulation.summary.object) # get maximum index for each level
+  
+  ### first plot : sample size
+  y <- list()
+  
+  # Extract the sample sizes from the dimension names using some functions
+  # which parse through strings: 
+  x <- as.numeric(
+    gsub('[^0-9]','',dimnames(simulation.summary.object)[[1]]))
+  
+  # Draw the first plot:
+  method.names <- gsub('boot.method: ','',
+                       dimnames(simulation.summary.object)[[3]])
+
+  matplot(x,
+          simulation.summary.object[,dims[2],,stat.ind], 
+          ylab=statistic, 
+          xlab='sample size',
+          type='l',
+          col=seq(1,dims[3]))
+  
+  legend('topright',
+         method.names, 
+         lty=1, col=seq(1,dims[3]), bty='n', cex=.75)
+  
+  
+}
+
