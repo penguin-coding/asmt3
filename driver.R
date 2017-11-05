@@ -34,5 +34,22 @@ print(Sys.time())
 norm.results <- calculate.summaries(norm.sim, 0)
 pois.results <- calculate.summaries(pois.sim, 100)
 
-norm.coverage.table <- norm.results[1:5, 1:7,]
-plot(norm.results, statistic='coverage', factor=1)
+for (results in list(norm.results, pois.results)){
+  for (statistic in c('coverage','length','failure tendency')){
+    plot(results, statistic=statistic)
+  }
+}
+
+for (method in 1:4){
+  for (statistic in c('failure tendency')){
+    
+    # Because parametric bootstraps have a coverage of 1 in these simulations,
+    # the failure tendency is NaN, since there are no failures. Hence we skip
+    # this case to avoid errors with plot.sim.3D:
+    if (statistic!='length' & method==3) next
+    
+    sim.plot.3D(norm.results, statistic=statistic, method=method, hist=F)
+    
+  }
+}
+

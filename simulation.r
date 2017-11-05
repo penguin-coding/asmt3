@@ -2,7 +2,9 @@
 # in the text. 
 
 source('BCaHelperFunctions.r') # Use Len's code to help with BCa Bootstrap
-
+library(plot3D)                # Used by the sim.plot.3D function
+library(reshape2)              # Used bt the sim.plot.3D function
+library(rgl)
 non.parametric.sample <- function(data, n){
   # purpose : produces n random samples of size 'size' from the supplied data
   #
@@ -246,7 +248,7 @@ calculate.summaries <- function(simulation.output.object, true.value){
   
   dims <- dim(simulation.output.object)
   
-  output <- array(dim = c(dims[1],dims[2],dims[3],2))
+  output <- array(dim = c(dims[1],dims[2],dims[3],3))
   dimnames(output) <- dimnames(simulation.output.object)
   for (i in 1:dims[1]){     # With nested for loops, go through the 
     for(j in 1:dims[2]){    # simulated bootstrap intervals and calculate
@@ -256,10 +258,11 @@ calculate.summaries <- function(simulation.output.object, true.value){
         
         coverage <- get.coverage(boot.ints,true.value) # calculate the
         length <- get.length(boot.ints)                # statistics
+        failure.tend <- get.coverage(boot.ints,true.value,failure.t=T)
          
-        summaries <- c(coverage,length)                # add them to the 
-        names(summaries) <- c('coverage','length')     # output object with
-        output[i,j,k,] <- summaries                    # appropriate names
+        summaries <- c(coverage,length,failure.tend)   # add them to the output
+        names(summaries) <- c('coverage','length','failure tendency') #  object
+        output[i,j,k,] <- summaries                    # with appropriate names
       }
     }
   }
@@ -268,12 +271,20 @@ calculate.summaries <- function(simulation.output.object, true.value){
   return(output)
 }
 
-get.coverage <- function(bootstrap.results, true.value){
+get.coverage <- function(bootstrap.results, true.value, failure.t=FALSE){
   # purpose : returns the observed coverage, given a vector which contains
   #           a sequence of confidence intervals
   #
   # input   : bootstrap.results - a vector containing bootstrap intervals in the
-  #           format c(lower1, upper1, lower2, upper2, etc.)
+  #                               format c(lower1, upper1, lower2, upper2, etc.)
+  #           true.value        - the true value of the statistic of interest. 
+  #                               Allows for the calculation of the coverage
+  #           failure.t         - failure tendency. Allows the function to
+  #                               return the failure tendency rather than the 
+  #                               coverage. Failure tendency is a measure (from
+  #                               0 to 1), of the proportion of the time the
+  #                               true value of the statistic was to the left of
+  #                               the confidence interval
   #
   # output  : numeric scalar ; the observed coverage given the vector of
   #           bootstrap intervals
@@ -290,7 +301,13 @@ get.coverage <- function(bootstrap.results, true.value){
   # is the true.value contained in each of our confidence intervals? :
   in.interval <- (true.value>=lowers & true.value<=uppers)
   
-  return(sum(in.interval)/(n/2)) # return the observed coverage
+  if(!failure.t){return(sum(in.interval)/(n/2))} # return the observed coverage
+  
+  else{
+    not.in <- as.logical(1-in.interval)
+    failed.lowers <- lowers[not.in]                   # return the observed 
+    return(sum(true.value<failed.lowers)/sum(not.in)) # failure tendency
+  }
 }
 
 get.length <- function(bootstrap.results){
@@ -330,34 +347,121 @@ plot.simulation.summary.object <- function(simulation.summary.object,
   if (class(simulation.summary.object)!='simulation.summary.object'){
     stop('invalid input type')}
   
-  if ( !(statistic %in% c('coverage','length')) ){
+  if ( !(statistic %in% c('coverage','length','failure tendency')) ){
     stop('invalid choice of statistic')}
   
   # fetch summary statistic index:
-  ifelse(statistic=='coverage', stat.ind <- 1, stat.ind <- 2) 
+  stat.ind <- switch(statistic,'coverage'=1, 'length'=2, 'failure tendency'=3) 
   
   dims <- dim(simulation.summary.object) # get maximum index for each level
   
-  ### first plot : sample size
-  y <- list()
+  ### first plot : sample size, second plot : bootstrap resamples
   
-  # Extract the sample sizes from the dimension names using some functions
-  # which parse through strings: 
-  x <- as.numeric(
-    gsub('[^0-9]','',dimnames(simulation.summary.object)[[1]]))
+  for (plot.num in c(1,2)){
+ 
+    if (plot.num==1){ # generate correct variables for sample size plot
+      
+      # extract sample size values from the simulation.summary.object dimnames:
+      x <- as.numeric(gsub('[^0-9]','',
+                           dimnames(simulation.summary.object)[[1]]))
+      
+      # extract statistic values for 
+      y <- simulation.summary.object[,dims[2],,stat.ind]
+      
+      xlab = 'sample size' ; 
+    }
+    
+    else{ # generate correct variables for bootstrap resamples plot
+      
+      x <- as.numeric(gsub('[^0-9]','',
+                           dimnames(simulation.summary.object)[[2]]))
+      
+      y <- simulation.summary.object[dims[1],,,stat.ind]
+      xlab = 'bootstrap resamples'
+    }
   
-  # Draw the first plot:
-  method.names <- gsub('boot.method: ','',
-                       dimnames(simulation.summary.object)[[3]])
+  
+    # Draw the first plot:
+    method.names <- gsub('boot.method: ','',
+                         dimnames(simulation.summary.object)[[3]])
 
-  matplot(x,
-          simulation.summary.object[,dims[2],,stat.ind], 
-          ylab=statistic, 
-          xlab='sample size',
-          type='l',
-          col=seq(1,dims[3]))
+    matplot(x,y,ylab=statistic,xlab=xlab,type='l',col=seq(1,dims[3]))
   
-  legend('topright',
-         method.names, 
-         lty=1, col=seq(1,dims[3]), bty='n', cex=.75)
+    legend('topright',method.names,lty=1,col=seq(1,dims[3]),bty='n',cex=.75)
+  }
+}
+
+sim.plot.3D <- function(simulation.summary.object, statistic, method,hist=F,
+                        ...){
+  # purpose : produces 3D plots of summary statistics for simulated bootstrap 
+  #           intervals. Uses methods available by various packages and produces 
+  #           2 different types of 3D plot.
+  #
+  # inputs  : simulation.summary.object - the multi-dimensional array containing
+  #                                       the summary statistics for each level
+  #                                       of simulation setting.
+  #           statistic                 - the character name of the statistic
+  #                                       to be plotted
+  #           method                    - the integer index of the method to be
+  #                                       plotted. Which values are valid
+  #                                       depends on the shape of the object 
+  #                                       passed to calculate.summaries
+  #           hist                      - logical parameter. If TRUE, produces a 
+  #                                       3D histogram instead of a 3D
+  #                                       3D perspective plot
+  #           ...                       - extra optional parameters to be passed
+  #                                       to the scatter 3D function.
+  #
+  # ouput   :  list containing:
+  #            x - the sample size values used for the persp3D plot
+  #            y - the bootstrap resample values used for the persp3D plot
+  #            z - the matrix of statistic values corresponding to the z
+  #                values of x and y for the persp3D plot
+  #
+  # note    : The output is likely of no use to the user, unless they choose
+  #           to obtain a plot using this data and a different 3D plotting 
+  #           function. The purpose of the output is primarily for debugging
+  #           and ensuring the data look as expected. 
+  
+  ### input checks:
+  
+  if (class(simulation.summary.object)!='simulation.summary.object'){
+    stop('invalid input type')}
+  
+  if ( !(statistic %in% c('coverage','length','failure tendency')) ){
+    stop('invalid choice of statistic')}
+  
+  if (method<1 | method%%1!=0 | method>dim(simulation.summary.object)[3]){
+    stop('invalid choice of method')}
+  
+  ### end of input checks ###
+  
+  
+  # fetch summary statistic index:
+  stat.ind <- switch(statistic,'coverage'=1, 'length'=2, 'failure tendency'=3)
+  
+  Dnames <- dimnames(simulation.summary.object)               # extract method
+  method.name <- gsub('boot.method: ','',Dnames[[3]][method]) # name
+  
+  ### Format the data for the call to scatter3D and produce a 3D scatter:
+  M <- melt(simulation.summary.object[,,method,stat.ind])
+  
+  x <- as.numeric(gsub('[^0-9]','',M$Var1)) # extract x, y, and z coordinate
+  y <- as.numeric(gsub('[^0-9]','',M$Var2)) # values from the melted object
+  z <- M$value                              # and produce our plot
+  
+  scatter3D(x, y, z, main=method.name,xlab='sample size',
+            ylab='bootstrap resamples', zlab=statistic,...)
+  
+  ### Format the data for the call to persp3D and draw the surface:
+  x <- as.numeric(gsub('sample.n: ','',Dnames[[1]])) # extract the numeric 
+  y <- as.numeric(gsub('boot.n: ','',Dnames[[2]]))   # values of the xs and ys, 
+  z <- simulation.summary.object[,,method,stat.ind]  # and the matching z matrix
+  
+  ifelse(hist, func3D <- hist3D, func3D <- persp3D)
+  
+  func3D(x,y,z,xlab='sample size',ylab='bootstrap resamples', zlab=statistic,
+          main=method.name)
+  
+  invisible(list(x,y,z)) # to avoid a potentially large matrix from printing
 }
