@@ -8,6 +8,8 @@ set.seed(12**3*4**5)
 # available in the project zip file as 'SimGlobalEnv.r'.
 
 print(Sys.time())
+
+# Full simulation with normal data
 norm.sim <- simulation(dist.func=rnorm,
                        simulations=1000,
                        sample.n=c(10,50,100,500,1000),
@@ -16,6 +18,7 @@ norm.sim <- simulation(dist.func=rnorm,
                        stat.func=mean,
                        smooth.sd=0.1)
 
+# Full simulation with Poisson data
 pois.sim <- simulation(dist.func=rpois,
                        simulations=1000,
                        sample.n=c(10,50,100,500,1000),
@@ -25,6 +28,20 @@ pois.sim <- simulation(dist.func=rpois,
                        smooth.sd=0.1,
                        lambda=100)
 
+# Partial simulation with gamma data, to look at failure tendency with an
+# extremely skewed distribution. Exploratory analysis of the above data
+# seemed to indicate there was no obvious relationship between sample size and
+# failure tendency or between bootstrap resamples and failure tendency.
+gamm.sim <- simulation(dist.func=rgamma,
+                       simulations=1000,
+                       sample.n=200,
+                       boot.n=c(99,499,999),
+                       boot.method=c('percentile','BCa','smooth'),
+                       stat.func=mean,
+                       smooth.sd=0.1,
+                       shape=3,
+                       rate=10)
+
 smooth.values <- seq(0,1,length=30)
 smooth.sim.coverage = smooth.sim.length <- rep(NA, length(smooth.values))
 
@@ -33,6 +50,7 @@ print(Sys.time())
 
 norm.results <- calculate.summaries(norm.sim, 0)
 pois.results <- calculate.summaries(pois.sim, 100)
+gamm.results <- calculate.summaries(gamm.sim, 3/10)
 
 for (results in list(norm.results, pois.results)){
   for (statistic in c('coverage','length','failure tendency')){
