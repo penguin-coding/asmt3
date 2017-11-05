@@ -1,7 +1,62 @@
-x = seq(1,15)
-y = c(4.39, 9.32, 13.77, 18.28, 23.48,   # Some observed times for
-      31.85,32.38, 36.75, 40.69, 55,     # calculation times
-      52.75, 58.27, 60.5, 62.58, 75.11)
+source('simulation.r')
+dosims <- function(x,sample.n,boot.n){
+    
+    norm.sim <- simulation(dist.func=rnorm,
+                           simulations=x,
+                           sample.n=sample.n,
+                           boot.n=boot.n,
+                           boot.method=
+                             c('percentile','BCa','parametric','smooth'),
+                           stat.func=mean,
+                           smooth.sd=0.1)
+  
+    pois.sim <- simulation(dist.func=rpois,
+                           simulations=x,
+                           sample.n=sample.n,
+                           boot.n=boot.n,
+                           boot.method=
+                             c('percentile','BCa','parametric','smooth'),
+                           stat.func=mean,
+                           smooth.sd=0.1,
+                           lambda=100)
+  
+    gamm.sim <- simulation(dist.func=rgamma,
+                           simulations=x,
+                           sample.n=sample.n,
+                           boot.n=boot.n,
+                           boot.method=c('percentile','BCa','smooth'),
+                           stat.func=mean,
+                           smooth.sd=0.1,
+                           shape=3,
+                           rate=10)
+  
+  smooth.sd <- seq(0.01,0.25,length=10)
+  smoot.sim <- as.list(rep(NA, length(smooth.sd)))
+  
+  counter = 0
+  for (i in smooth.sd){
+    counter = counter + 1
+    sim <- simulation(dist.func=rnorm,
+                      simulations=x,
+                      sample.n=500,
+                      boot.n=999,
+                      boot.method='smooth',
+                      stat.func=mean,
+                      smooth.sd=smooth.sd[counter])
+    smoot.sim[[counter]] <- sim[1,1,1,]
+  }
+  
+  
+  return()
+}
+
+get.time = function(x,sample.n,boot.n){
+  return(system.time(dosims(x,sample.n,boot.n))[3])
+}
+
+x <- seq(2)
+y <-  lapply(x, get.time, sample.n=c(50,100,500,1000), boot.n=c(99,199,499,999))
+y <- unlist(y)
 
 A = lm(y~x-1)  # We fit a lm with no intercept, and check
 summary(A)     # it produces a reasonable answer. 
@@ -10,7 +65,7 @@ plot(x,y)                    # We visualise the fitted line
 abline(0,A$coefficients)
 
 pred.time <- function(s){     # We write a very simple function
-  secs <- 2*A$coefficients*s  # which returns the expected
+  secs <- A$coefficients*s    # which returns the expected
   mins <- secs/60             # calculation time for s simulations
   hours <- mins/60            # per case, based on our observed
   return(hours)               # values
