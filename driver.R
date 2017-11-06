@@ -87,7 +87,7 @@ for (results in list(norm.results, pois.results, gamm.results)){
 }
 
 for (method in 1:4){
-  for (statistic in c('failure tendency')){
+  for (statistic in c('coverage')){
 
     # Because parametric bootstraps have a coverage of 1 in these simulations,
     # the failure tendency is NaN, since there are no failures. Hence we skip
