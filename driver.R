@@ -3,71 +3,99 @@ source('simulation.r')
 set.seed(12**3*4**5)
 
 ##### WARNING #####
-# This simulation takes a long time to run - roughly 1.5 hours on a 4.0 GHz
+# This simulation takes a long time to run - roughly 1.3 hours on a 4.0 GHz
 # processor. The global environment produced by this file is made
 # available in the project zip file as 'SimGlobalEnv.r'.
 
 print(Sys.time())
 
+sample.n <- c(50,100,500,1000)
+boot.n <- c(99,199,499,999)
+simulations <- 1000
+boot.method=c('percentile','BCa','parametric','smooth')
 # Full simulation with normal data
 norm.sim <- simulation(dist.func=rnorm,
-                       simulations=1000,
-                       sample.n=c(10,50,100,500,1000),
-                       boot.n=c(49,199,499,999,1999,2999),
-                       boot.method=c('percentile','BCa','parametric','smooth'),
+                       simulations=simulations,
+                       sample.n=sample.n,
+                       boot.n=boot.n,
+                       boot.method=boot.method,
                        stat.func=mean,
                        smooth.sd=0.1)
 
 # Full simulation with Poisson data
 pois.sim <- simulation(dist.func=rpois,
-                       simulations=1000,
-                       sample.n=c(10,50,100,500,1000),
-                       boot.n=c(49,199,499,999,1999,2999),
-                       boot.method=c('percentile','BCa','parametric','smooth'),
+                       simulations=simulations,
+                       sample.n=sample.n,
+                       boot.n=boot.n,
+                       boot.method=boot.method,
                        stat.func=mean,
                        smooth.sd=0.1,
                        lambda=100)
 
-# Partial simulation with gamma data, to look at failure tendency with an
-# extremely skewed distribution. Exploratory analysis of the above data
-# seemed to indicate there was no obvious relationship between sample size and
-# failure tendency or between bootstrap resamples and failure tendency.
+# Full simulation with gamma data. The skewness of this distribution will 
+# hopefully allow for more meaningful insight into the behaviour of failure
+# tendency for each type of bootstrap. We exempt parametric bootstraps, 
+# because their coverage for high numbers of bootstrap resamples is 1.
 gamm.sim <- simulation(dist.func=rgamma,
-                       simulations=1000,
-                       sample.n=200,
-                       boot.n=c(99,499,999),
-                       boot.method=c('percentile','BCa','smooth'),
+                       simulations=simulations,
+                       sample.n=sample.n,
+                       boot.n=boot.n,
+                       boot.method=boot.method,
                        stat.func=mean,
                        smooth.sd=0.1,
                        shape=3,
                        rate=10)
 
-smooth.values <- seq(0,1,length=30)
-smooth.sim.coverage = smooth.sim.length <- rep(NA, length(smooth.values))
+# We can't vary the proportion of the variance of the smoothing terms
+# with respect to the observed data using the simulation function, so 
+# we manually produce a small simulation dataset for analysis:
+smooth.sd <- seq(0.01,0.25,length=10)            # set our chosen values
+smoot.sim <- as.list(rep(NA, length(smooth.sd))) # object to store outputs
 
-
+counter = 0
+for (i in smooth.sd){
+  counter = counter + 1
+  sim <- simulation(dist.func=rnorm,
+                    simulations=simulations,
+                    sample.n=500, # we fix sample.n and boot.n for this
+                    boot.n=999,   # simulation, to save on computing time.
+                    boot.method='smooth',
+                    stat.func=mean,
+                    smooth.sd=smooth.sd[counter])
+  smoot.sim[[counter]] <- sim[1,1,1,]
+}
+remove(i) ; remove(counter) # remove unnecessary global vars
 print(Sys.time())
 
 norm.results <- calculate.summaries(norm.sim, 0)
 pois.results <- calculate.summaries(pois.sim, 100)
 gamm.results <- calculate.summaries(gamm.sim, 3/10)
 
-for (results in list(norm.results, pois.results)){
+for (results in list(norm.results, pois.results, gamm.results)){
   for (statistic in c('coverage','length','failure tendency')){
-    plot(results, statistic=statistic)
+    
+    # to avoid "the condition has length > 1" warnings, we compare the first
+    # element only - which should be sufficient for our purposes:
+    if (results[1,1,1,1]==norm.results[1,1,1,1]){main <- 'normal'}
+    else if (results[1,1,1,1]==pois.results[1,1,1,1]){main <- 'poisson'}
+    else {main <- 'gamma'}
+    
+    main <- paste(main, 'simulated deviates')
+    
+    plot(results, statistic=statistic,main=main)
   }
 }
 
 for (method in 1:4){
   for (statistic in c('failure tendency')){
-    
+
     # Because parametric bootstraps have a coverage of 1 in these simulations,
     # the failure tendency is NaN, since there are no failures. Hence we skip
     # this case to avoid errors with plot.sim.3D:
     if (statistic!='length' & method==3) next
-    
+
     sim.plot.3D(norm.results, statistic=statistic, method=method, hist=F)
-    
+
   }
 }
 

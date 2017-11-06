@@ -332,7 +332,7 @@ get.length <- function(bootstrap.results){
 }
 
 plot.simulation.summary.object <- function(simulation.summary.object,
-                                           statistic='coverage'){
+                                           statistic='coverage',...){
   # purpose : plots the statistic of interest for a set of simulation
   #           bootstrap confidence intervals, for all levels of 'factor'. Fixes
   #           the other setting values at their highest setting i.e. uses the 
@@ -341,7 +341,10 @@ plot.simulation.summary.object <- function(simulation.summary.object,
   # inputs  : simulation.summary.object - array of summary statistics for 
   #                                       simulation intervals.
   #           statistic                 - summary statistic of interest, 
-  #                                       'coverage', 'length'
+  #                                       'coverage', 'length','failure
+  #                                       tendency'
+  #           ...                       - extra optional parameters to be 
+  #                                       passed to matplot
   # output  : None, produces a plot. 
   
   if (class(simulation.summary.object)!='simulation.summary.object'){
@@ -385,7 +388,7 @@ plot.simulation.summary.object <- function(simulation.summary.object,
     method.names <- gsub('boot.method: ','',
                          dimnames(simulation.summary.object)[[3]])
 
-    matplot(x,y,ylab=statistic,xlab=xlab,type='l',col=seq(1,dims[3]))
+    matplot(x,y,ylab=statistic,xlab=xlab,type='l',col=seq(1,dims[3]),...)
   
     legend('topright',method.names,lty=1,col=seq(1,dims[3]),bty='n',cex=.75)
   }
