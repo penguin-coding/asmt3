@@ -49,7 +49,7 @@ gamm.sim <- simulation(dist.func=rgamma,
 # We can't vary the proportion of the variance of the smoothing terms
 # with respect to the observed data using the simulation function, so 
 # we manually produce a small simulation dataset for analysis:
-smooth.sd <- seq(0.01,0.25,length=10)            # set our chosen values
+smooth.sd <- seq(0.01,0.33,length=20)            # set our chosen values
 smoot.sim <- as.list(rep(NA, length(smooth.sd))) # object to store outputs
 
 counter = 0
@@ -67,6 +67,8 @@ for (i in smooth.sd){
 remove(i) ; remove(counter) # remove unnecessary global vars
 print(Sys.time())
 
+
+### Producing plots to visualise the simulation results:
 norm.results <- calculate.summaries(norm.sim, 0)
 pois.results <- calculate.summaries(pois.sim, 100)
 gamm.results <- calculate.summaries(gamm.sim, 3/10)
@@ -82,10 +84,30 @@ for (results in list(norm.results, pois.results, gamm.results)){
     
     main <- paste(main, 'simulated deviates')
     
-    plot(results, statistic=statistic,main=main)
+    plot(results, statistic=statistic, main=main)
   }
 }
 
+smooth.stats <- array(dim=c(length(smoot.sim),3))
+
+for (i in 1:length(smoot.sim)){                         # we manually create a
+  cov <- get.coverage(smoot.sim[[i]],0)                 # a matrix of summary 
+  len <- get.length(smoot.sim[[i]])                     # statistics for the
+  f.t <- get.coverage(smoot.sim[[i]],0,failure.t = T)   # simulation where only
+  smooth.stats[i,] <- c(cov,len,f.t)                    # the smooth.sd
+}                                                       # quantity varies
+
+
+# We manually produce some plots for the smooth bootstrap analysis:
+for (i in 1:3){
+  ylab <-  switch(i, '1'='coverage', '2'='length', '3'='failure tendency')
+  main <- 'Smooth bootstrap'
+  y <- smooth.stats[,i]
+  plot(smooth.sd, y,xlab = 'smooth.sd', ylab=ylab, main=main,
+       col=4)
+}
+
+### Create some 3D plots to use:
 for (method in 1:4){
   for (statistic in c('coverage')){
 
