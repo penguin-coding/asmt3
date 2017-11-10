@@ -58,9 +58,50 @@ get.bca.alphas <- function(data, est, boot.est, alpha, func){
   return(alphas)
 }
 
+bootstrap.type.checks <- function(data, n, alpha, func, method,
+                                  smooth.sd, dist.func=NULL){
+  # purpose : checks all the inputs of the bootstrap function are of the
+  #           expected type and satisfy all required conditions they impose on
+  #           each other
+  #
+  # inputs  : data      - vector of univariate observations
+  #           n         - number of bootstrap resamples
+  #           alpha     - target coverage of interval
+  #           func      - function which calculates statistic of interest
+  #           method    - character name of method to be used
+  #           smooth.sd - measure of the sd of noise used in smooth bootstraps
+  #           dist.func - character name of the function producing our deviates
+  #
+  # output  : NULL if no checks fail, otherwise, the error message relevant to 
+  #           the first check which failed
+  
+  if (class(data)!='numeric' & class(data)!='integer'){
+    stop('input data must be numeric')}
+  
+  if ((method=='parametric'| method=='par.fit') &   # if parametric: need a dist
+      !(is.character(dist.func) &                   # func name which is a func
+        is.function(try(match.fun(dist.func),silent=T))) ){
+    stop('when method is parametric or par.fit, dist.func must be provided')
+  }
+  
+  if (method=='smooth' & (class(smooth.sd)!='numeric' | smooth.sd<0 |
+                          length(smooth.sd)>1 )){
+    stop('When method = \'smooth\', smooth.sd must be a positive scalar')
+  }
+  
+  if (n%%1!=0 | n<2) stop('n must be a positive integer greater than 1')
+  
+  if (alpha<0 | alpha>1) stop('alpha must be between 0 and 1')
+  
+  if (!is.function(func)) stop('invalid function supplied as func argument')
+  
+  if (!method %in% c('percentile','BCa','parametric','smooth','par.fit')){
+    stop('invalid method')}
+  
+}
 bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
                       method = 'percentile', smooth.sd = 0.2, 
-                      dist.func = NULL, ...){
+                      dist.func = NULL, check.inputs=T, ...){
   # purpose : produces a 1 - alpha % confidence interval for the 'func' of the
   #           data, using a non-parametric bootstrap of n samples of size 'size'
   #
@@ -71,7 +112,7 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   #                        confidence interval will be produced
   #           func       - function to be used to calculate the statistic of
   #                        interest for each sample. The default is 'mean'. 
-  #           method     - 'percentile', 'BCa', 'parametric' or 'smooth'.
+  #           method     - 'percentile', 'BCa', 'parametric', 'smooth','par.fit'
   #                        Specifies the bootstrap method to be used. When
   #                        'parametric' is chosen, the percentile method is used
   #                        to calculate the confidence interval using the
@@ -81,6 +122,10 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   #                        'smooth' adds a normal noise centred at 0. The
   #                        chosen standard deviation is a fraction of the sample
   #                        sd. This is set using the parameter 'smooth.sd'.
+  #                        'par.fit' is a parametric percentile bootstrap, but
+  #                        it estimates the true parameters of the distribution
+  #                        from the data, rather than using the known values.
+  #                        Only works with dist.func = rnorm, rpois or rgamma.
   #           smooth.sd  - Multiplier for the sample standard deviation. When 
   #                        method = 'smooth', a normal noise id added to 
   #                        each bootstrap resample. It has mean 0 and standard
@@ -89,38 +134,44 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   #                        set to TRUE. It is assumed that the first argument
   #                        in any call to dist.func is the number of random
   #                        deviates to be produced, as is the convention with
-  #                        rnorm, runif, rpois, rgamma, etc.
+  #                        rnorm, runif, rpois, rgamma, etc. must be the
+  #                        character name of the function.
+  #           check.inputs - Logical, if TRUE, all inputs are type checked
   #           ...        - extra optional parameters to be passed to dist.func
   #          
   # output  : named vector containing the lower and upper bounds of the interval
   
-  # Input checks and setting default values: 
-  if(!is.null(dist.func)) dist.func <- match.fun(dist.func)
-  if (class(data)!='numeric' & class(data)!='integer'){
-    stop('input data must be numeric')}
+  # to allow the user to pass in the func or func name:
+  func <- try(match.fun(func), silent=T)
   
-  if ((method=='parametric' & is.null(dist.func))|
-      (method=='parametric' & !is.function(dist.func))){
-    stop('when parametric is set to TRUE a dist.func function must be provided')
-  }
-  
-  if (method=='smooth' & (class(smooth.sd)!='numeric' | smooth.sd<0 |
-                          length(smooth.sd)>1 )){
+  #### Input checks:
     
-    stop('When method = \'smooth\', smooth.sd must be a positive scalar')
+  if (check.inputs){
+    # if dist.func has not been set, call the checking function with NULL
+    if (is.null(dist.func)) bootstrap.type.checks(data, n, alpha, func, method,
+                                                  smooth.sd, NULL)
+    
+    # otherwise, pass in dist.func itself. If we tried to do this when
+    # dist.func is.null(), we would get an error, hence this unsatisfactory
+    # way of dealing with the problem:
+    else {bootstrap.type.checks(data, n, alpha, func, method, smooth.sd,
+                                dist.func)}
   }
-  
-  if (n%%1!=0 | n<2) stop('n must be a positive integer greater than 1')
-  if (alpha<0 | alpha>1) stop('alpha must be between 0 and 1')
-  func <- match.fun(func) # to allow the user to pass in the func or func name
-  if (!is.function(func)) stop('invalid function supplied as func argument')
-  if (!method %in% c('percentile','BCa','parametric','smooth')){
-    stop('invalid method')}
   
   ### End of input-checks
+  
+  if (is.null(dist.func)==FALSE & (method=='parametric'| method=='par.fit')){
+    dist.func.name <- dist.func       # for method=par.fit, we need to know
+    dist.func <- match.fun(dist.func) # the name of dist.func
+  }
+  
+  # If the user has set smooth.sd to 0 and wants a smooth bootstrap, we obtain
+  # the same result more efficiently by simply providing them with a percentile
+  # bootstrap:
   if (smooth.sd==0 & method=='smooth') method <- 'percentile'
   
-  if (method!='parametric'){  # generate the random samples with replacement
+  if (method!='parametric' & method!='par.fit'){
+    # generate the random samples with replacement:
     samples <- replicate(n, sample(x=data, size=length(data),replace=T)) 
     
     if (method=='smooth'){ # add noise to the data for a smooth bootstrap
@@ -131,10 +182,40 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   }
   
   else{ # parametric resamples
+    
+    if (method=='par.fit'){
+      
+      # get MLEs for the parameters of the distribution:
+      dist.func.args <- switch(dist.func.name,
+                               
+                               # if the data are normal, this is easy using
+                               # sample statistics
+                               rnorm=list(n=length(data),mean=mean(data),
+                                          sd=sd(data)),
+                               
+                               # same goes for poisson data
+                               rpois=list(n=length(data),lambda=mean(data)),
+                               
+                               # if the data are gamma, we need to call an MLE
+                               # function to get the estimates, and extract
+                               # initial guesses from the ones passed by the
+                               # user using ... arguments. 
+                               rgamma=as.list(c(n=length(data),gammaMLE(
+                                 log(c(list(...)$rate,list(...)$shape)),data))))
+      
+      # Note, we add in n=length(data) to the list of estimated parameters so
+      # that the use of do.call() becomes possible
+    }
+    
+    # If method=='parametric' we simply use the true parameter values as the 
+    # ones we pass to dist.func:
+    else {dist.func.args <- as.list(c(n=length(data),list(...)))}
+    
+    samples <- matrix(nrow=length(data),ncol=n)
+    
     # the replicate function worked badly with functions like rpois and rt, 
     # so a less efficient method has to be used to produce parametric samples:
-    samples <- matrix(nrow=length(data),ncol=n)
-    for (i in 1:n){samples[,i] <- dist.func(length(data),...)}
+    for (i in 1:n){samples[,i] <- do.call(dist.func,dist.func.args)}
   }
   
   samples <- cbind(samples,data)                # add in the observed data
@@ -179,8 +260,7 @@ simulation <-  function(dist.func, simulations, sample.n, boot.n, boot.method,
   #          the statistics produced by the simulated intervals. Has class 
   #          'simulation.output.object'
   
-  ### note:
-  ### we don't type check inputs since the bootstrap function will do it for us.
+  
   
   # generate the multi-dimensional array which will store all of the generated 
   output <- array(data = NA,                                       # intervals
@@ -201,8 +281,10 @@ simulation <-  function(dist.func, simulations, sample.n, boot.n, boot.method,
         
         sims <- matrix(nrow=2, ncol=simulations)
         
+        dist.function <- match.fun(dist.func)
+        
         for (i in 1:simulations){
-          dataset <- dist.func(sample.n.setting, ...) # get the original sample
+          dataset <- dist.function(sample.n.setting, ...) # get the original sample
           
           # get the bootstrap interval for that dataset:
           boot <-  bootstrap(dataset, n=boot.n.setting, alpha=alpha,
@@ -467,4 +549,36 @@ sim.plot.3D <- function(simulation.summary.object, statistic, method,hist=F,
           main=method.name)
   
   invisible(list(x,y,z)) # to avoid a potentially large matrix from printing
+}
+
+gamma.neg.log.lik <- function(par, x){
+  # purpose : evaluated the negative log likelihood of a gamma distribution
+  #           given parameter guesses on the real line, and data x
+  #
+  # inputs  : par - parameter estimates for rate and shape as a vector on the
+  #                 real line. A log link is applied to transform these values
+  #                 to positive ones. 
+  #
+  # output  : numeric scalar, the negative log likelihood evaluated at x and 
+  #           the transformed par
+  
+  par <- exp(par) # log links to keep alpha and beta positive
+  alpha <- par[1] ; beta <- par[2]
+  return(-sum(log(dgamma(x,rate=alpha, shape=beta))))
+}
+
+gammaMLE <- function(par,x,...){
+  # purpose : Maximum likelihood estimation of parameters for a gamma
+  #           distribution, given observations and initial guesses on the 
+  #           real line
+  #
+  # inputs  : par - values such that exp(par) gives the initial estimates of 
+  #                 the rate and shape parameters of the gamma distribution, 
+  #                 respectively
+  #           x   - vector of observations from the gamma process in question
+  #           ... - extra optional parameters to be passed to optim
+  #
+  # output  : the estimated parameters as a list
+  ests <- exp(optim(par, gamma.neg.log.lik, x=x,...)$par)
+  return(list(rate=ests[1],shape=ests[2]))
 }

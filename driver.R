@@ -12,18 +12,20 @@ print(Sys.time())
 sample.n <- c(50,100,500,1000)
 boot.n <- c(99,199,499,999)
 simulations <- 1000
-boot.method=c('percentile','BCa','parametric','smooth')
+boot.method=c('percentile','BCa','parametric','smooth','par.fit')
 # Full simulation with normal data
-norm.sim <- simulation(dist.func=rnorm,
+norm.sim <- simulation(dist.func='rnorm',
                        simulations=simulations,
                        sample.n=sample.n,
                        boot.n=boot.n,
                        boot.method=boot.method,
                        stat.func=mean,
-                       smooth.sd=0.1)
+                       smooth.sd=0.1,
+                       mean=0,
+                       sd= 1)
 
 # Full simulation with Poisson data
-pois.sim <- simulation(dist.func=rpois,
+pois.sim <- simulation(dist.func='rpois',
                        simulations=simulations,
                        sample.n=sample.n,
                        boot.n=boot.n,
@@ -36,7 +38,7 @@ pois.sim <- simulation(dist.func=rpois,
 # hopefully allow for more meaningful insight into the behaviour of failure
 # tendency for each type of bootstrap. We exempt parametric bootstraps, 
 # because their coverage for high numbers of bootstrap resamples is 1.
-gamm.sim <- simulation(dist.func=rgamma,
+gamm.sim <- simulation(dist.func='rgamma',
                        simulations=simulations,
                        sample.n=sample.n,
                        boot.n=boot.n,
