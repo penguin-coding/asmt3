@@ -6,7 +6,8 @@ library(plot3D)                # Used by the sim.plot.3D function
 library(reshape2)              # Used bt the sim.plot.3D function
 library(rgl)
 non.parametric.sample <- function(data, n){
-  # purpose : produces n random samples of size 'size' from the supplied data
+  # purpose : produces n random samples of size length(data) from the supplied
+  #           data
   #
   # inputs  : data - numeric vector of univariate observations
   #           n    - positive integer number of samples to be drawn
