@@ -5,6 +5,8 @@ source('BCaHelperFunctions.r') # Use Len's code to help with BCa Bootstrap
 library(plot3D)                # Used by the sim.plot.3D function
 library(reshape2)              # Used bt the sim.plot.3D function
 library(rgl)
+library(magrittr) # ceci n'est pas une pipe, hon hon hon
+
 non.parametric.sample <- function(data, n){
   # purpose : produces n random samples of size length(data) from the supplied
   #           data
@@ -287,7 +289,7 @@ simulation <-  function(dist.func, simulations, sample.n, boot.n, boot.method,
         dist.function <- match.fun(dist.func)
         
         for (i in 1:simulations){
-          dataset <- dist.function(sample.n.setting, ...) # get the original sample
+          dataset <- dist.function(sample.n.setting, ...) # get the O.G. sample
           
           # get the bootstrap interval for that dataset:
           boot <-  bootstrap(dataset, n=boot.n.setting, alpha=alpha,
@@ -440,7 +442,14 @@ plot.simulation.summary.object <- function(simulation.summary.object,
   
   # fetch summary statistic index:
   stat.ind <- switch(statistic,'coverage'=1, 'length'=2, 'failure tendency'=3) 
-
+  
+  # get dimensions of summary object:
+  dims <- dim(simulation.summary.object)
+  dims.not.stats <- dim(simulation.summary.object[,,,1])
+  
+  msg1 <- 'Can only plot summaries when sample.n, bootstrap.n and'
+  msg2 <- 'method are all vectors'
+  if (any(dims.not.stats<2)) stop(paste(msg1, msg2))
   
   for (plot.num in c(1,2)){
   # generate sample size plot first, then bootstrap plot
@@ -507,6 +516,10 @@ sim.plot.3D <- function(simulation.summary.object, statistic, method,hist=F,
   if (method<1 | method%%1!=0 | method>dim(simulation.summary.object)[3]){
     stop('invalid choice of method')}
   
+  if (any(dim(simulation.summary.object[,,,1])<2)){
+    stop('all simulation settings must be vectors to plot in 3D')
+  }
+  
   ### end of input checks ###
   
   
@@ -552,7 +565,8 @@ gamma.neg.log.lik <- function(par, x){
   
   par <- exp(par) # log links to keep alpha and beta positive
   alpha <- par[1] ; beta <- par[2]
-  return(-sum(log(dgamma(x,rate=alpha, shape=beta))))
+  loglik <- dgamma(x, rate=alpha, shape=beta) %>% log %>% sum
+  return(-loglik)
 }
 
 gammaMLE <- function(par,x,...){
