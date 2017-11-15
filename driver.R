@@ -1,13 +1,18 @@
-source('simulation.r')
+# I confirm that the attached is my own work, except where clearly indicated in
+# the text.
 
-set.seed(12**3*4**5)
+source('simulation.r')
+library('magrittr')   # ceci n'est pas une %>%
+
+set.seed(12**3*4**5)  # to make results reproducible to the reader
 
 ##### WARNING #####
-# This simulation takes a long time to run - roughly 1.3 hours on a 4.0 GHz
+
+# This simulation takes a long time to run - roughly 3 hours on a 4.0 GHz
 # processor. The global environment produced by this file is made
 # available in the project zip file as 'SimGlobalEnv.r'.
 
-print(Sys.time())
+print(Sys.time()) # We also print the end time
 
 sample.n <- c(50,100,500,1000)
 boot.n <- c(99,199,499,999)
@@ -70,7 +75,11 @@ remove(i) ; remove(counter) # remove unnecessary global vars
 print(Sys.time())
 
 
-### Producing plots to visualise the simulation results:
+
+
+
+############# Producing plots to visualise the simulation results ##############
+
 norm.results <- calculate.summaries(norm.sim, 0)
 pois.results <- calculate.summaries(pois.sim, 100)
 gamm.results <- calculate.summaries(gamm.sim, 3/10)
@@ -109,7 +118,12 @@ for (i in 1:3){
        col=4)
 }
 
-### Create some 3D plots to use:
+
+
+
+
+################ Create some 3D plots for the standard analyses ################
+
 for (method in 1:4){
   for (statistic in c('coverage')){
 
@@ -123,3 +137,15 @@ for (method in 1:4){
   }
 }
 
+### side analysis looking at BCa vs percentile for low n and high resamples ####
+pois.sim2 <- simulation(dist.func='rpois',
+                        simulations=simulations,
+                        sample.n=c(10,20,35,50),
+                        boot.n=c(2999,3499),
+                        boot.method=c('percentile','BCa'),
+                        stat.func=mean,
+                        lambda=100)
+
+# Produce the plot which supports our claim that the BCa is better for low n:
+pois.sim2 %>% calculate.summaries(100) %>% plot(statistic='coverage',
+                                                main='Poisson data')
