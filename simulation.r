@@ -100,6 +100,7 @@ bootstrap.type.checks <- function(data, n, alpha, func, method,
     stop('invalid method')}
   
 }
+
 bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
                       method = 'percentile', smooth.sd = 0.2, 
                       dist.func = NULL, check.inputs=T, ...){
@@ -172,6 +173,7 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   if (smooth.sd==0 & method=='smooth') method <- 'percentile'
   
   if (method!='parametric' & method!='par.fit'){
+    
     # generate the random samples with replacement:
     samples <- replicate(n, sample(x=data, size=length(data),replace=T)) 
     
@@ -438,36 +440,21 @@ plot.simulation.summary.object <- function(simulation.summary.object,
   
   # fetch summary statistic index:
   stat.ind <- switch(statistic,'coverage'=1, 'length'=2, 'failure tendency'=3) 
-  
-  dims <- dim(simulation.summary.object) # get maximum index for each level
-  
-  ### first plot : sample size, second plot : bootstrap resamples
+
   
   for (plot.num in c(1,2)){
- 
-    if (plot.num==1){ # generate correct variables for sample size plot
+  # generate sample size plot first, then bootstrap plot
       
-      # extract sample size values from the simulation.summary.object dimnames:
-      x <- as.numeric(gsub('[^0-9]','',
-                           dimnames(simulation.summary.object)[[1]]))
+    # extract x axis values from the simulation.summary.object dimnames:
+    x <- as.numeric(gsub('[^0-9]','',
+                         dimnames(simulation.summary.object)[[plot.num]]))
       
-      # extract statistic values for 
-      y <- simulation.summary.object[,dims[2],,stat.ind]
+    # extract statistic values and average over index not being plotted:
+    y <- apply(simulation.summary.object[,,,stat.ind], c(plot.num,3), mean)
       
-      xlab = 'sample size' ; 
-    }
-    
-    else{ # generate correct variables for bootstrap resamples plot
-      
-      x <- as.numeric(gsub('[^0-9]','',
-                           dimnames(simulation.summary.object)[[2]]))
-      
-      y <- simulation.summary.object[dims[1],,,stat.ind]
-      xlab = 'bootstrap resamples'
-    }
+    xlab = c('sample size','bootstrap resamples')[plot.num]
   
-  
-    # Draw the first plot:
+    # Draw the plot:
     method.names <- gsub('boot.method: ','',
                          dimnames(simulation.summary.object)[[3]])
 
@@ -524,7 +511,7 @@ sim.plot.3D <- function(simulation.summary.object, statistic, method,hist=F,
   
   
   # fetch summary statistic index:
-  stat.ind <- switch(statistic,'coverage'=1, 'length'=2, 'failure tendency'=3)
+  stat.ind <- switch(statistic, 'coverage'=1, 'length'=2, 'failure tendency'=3)
   
   Dnames <- dimnames(simulation.summary.object)               # extract method
   method.name <- gsub('boot.method: ','',Dnames[[3]][method]) # name
@@ -553,7 +540,7 @@ sim.plot.3D <- function(simulation.summary.object, statistic, method,hist=F,
 }
 
 gamma.neg.log.lik <- function(par, x){
-  # purpose : evaluated the negative log likelihood of a gamma distribution
+  # purpose : evaluates the negative log likelihood of a gamma distribution
   #           given parameter guesses on the real line, and data x
   #
   # inputs  : par - parameter estimates for rate and shape as a vector on the
