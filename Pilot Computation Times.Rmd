@@ -1,0 +1,90 @@
+---
+title: "Predicted Calculation Times Pilot"
+output: html_document
+---
+
+# What does this file do? 
+
+We want a way of estimating the calculation times for larger simulation numbers,
+without having to run them. In this case, it is reasonable to assume that
+increasing the simulation number linearly also increases computation time
+linearly, since in terms of computation time, running the file with n
+simulations is very similar to running the file with 1 simulation, n times. 
+
+We fit a linear model without an intercept (since 0 simulations should take no
+time) and use this to extrapolate for larger values. We then decide which 
+simulation number would be reasonable for our main analysis. The way that this
+pilot code behaves allows for running this file again to obtain new estimates 
+very easily if the driver code is changed. 
+
+## First code block:
+
+This block obtains our response (computation time) for our chosen values of
+pilot simulation numbers per case
+
+```{r, warning=F, results='hide'}
+#### NEEDS TO BE RUN ON A CLEAN ENVIRONMENT AND ENVIRONMENT SHOULD BE CLEANED
+#### BEFORE RUNNING FULL SIMULATION
+
+### Note: running this code on any other machines will not produce the same
+### predicted times, refer to the figure in the report for the specific
+### graph this produced on my machine. 
+
+x <- seq(5)  # Setting this to 5 takes 2 minutes on my machine, but 3 is enough
+y <- rep(NA, length(x))
+
+for (j in x){
+  # Our x values are the number of different simulations we run for each case.
+  # Our y values is the computation time required for the respective x.
+  # We will attempt to draw a graph of simulations per case and computation 
+  # time, so that we can select a compromise between high simulations and 
+  # available time.
+  
+  pilot.sims <- x[j]
+  y.val <- system.time(source('driver.R'))[3]
+  y[j] <- y.val
+}
+```
+
+## Second code block:
+
+This block fits the linear model and gives us a summary
+
+```{r}
+A = lm(y~x-1)    # We fit a lm and check it
+summary(A)       # produces a reasonable answer. 
+
+plot(x,y)                    # We visualise the fitted line
+abline(0,A$coefficients)
+```
+
+## Third code block:
+
+This block plots the fitted model so we can use the visual aid to decide how
+many simulations we want to use in the final study
+
+```{r}
+pred.time <- function(s){     # We write a very simple function
+  secs <- A$coefficients*s    # which returns the expected
+  mins <- secs/60             # calculation time for s simulations
+  hours <- mins/60            # per case, based on our observed
+  return(hours)               # values
+}
+
+plot.x = seq(1,2000)        # we plot expected calculation times
+plot.y = pred.time(plot.x)  # so that we can choose how many to use
+
+plot(plot.x, plot.y, xlab = 'number of simulations per case',
+     ylab = 'Time for all simulations to run - hours',
+     type='l',
+     main = 'Predicted calculation times for 4.0GHz CPU')
+```
+
+## Final decision:
+
+Jusding by the graph this produced on my machine, I select 1000 as the chosen
+simulation number for the analysis, which has a predicted computation time
+(in hours) of:
+```{r, echo=F}
+pred.time(1e3)
+```
