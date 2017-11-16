@@ -3,8 +3,8 @@
 
 source('BCaHelperFunctions.r') # Use Len's code to help with BCa Bootstrap
 library(plot3D)                # Used by the sim.plot.3D function
-library(reshape2)              # Used bt the sim.plot.3D function
-library(rgl)
+library(reshape2)              # Used by the sim.plot.3D function
+library(rgl)                   # Used by the sim.plot.3D function
 library(magrittr) # ceci n'est pas une pipe, hon hon hon
 
 non.parametric.sample <- function(data, n){
@@ -14,7 +14,7 @@ non.parametric.sample <- function(data, n){
   # inputs  : data - numeric vector of univariate observations
   #           n    - positive integer number of samples to be drawn
   #
-  # output  : size*n dimension matrix. Each column is a generated sample.
+  # output  : length(data)*n dimension matrix. Each column is a generated sample
   
   if (class(data)!='numeric' & class(data)!='integer'){
     stop('input data must be numeric')}
