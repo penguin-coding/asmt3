@@ -53,6 +53,12 @@ gamm.sim <- simulation(dist.func='rgamma',
                        shape=3,
                        rate=10)
 
+
+
+
+
+# Side analysis looking at how the quantity of noise affects smooth bootstraps #
+
 # We can't vary the proportion of the variance of the smoothing terms
 # with respect to the observed data using the simulation function, so 
 # we manually produce a small simulation dataset for analysis:
@@ -78,13 +84,28 @@ print(Sys.time())
 
 
 
+### side analysis looking at BCa vs percentile for low n and high resamples ####
+
+pois.sim2 <- simulation(dist.func='rpois',
+                        simulations=simulations,
+                        sample.n=c(10,20,35,50),
+                        boot.n=c(2999,3499),
+                        boot.method=c('percentile','BCa'),
+                        stat.func=mean,
+                        lambda=100)
+
+
+
+
+
 ############# Producing plots to visualise the simulation results ##############
 
-norm.results <- calculate.summaries(norm.sim, 0)
-pois.results <- calculate.summaries(pois.sim, 100)
-gamm.results <- calculate.summaries(gamm.sim, 3/10)
+norm.results <- calculate.summaries(norm.sim, 0)    # calculate coverage, length
+pois.results <- calculate.summaries(pois.sim, 100)  # and 'failure tendency'
+gamm.results <- calculate.summaries(gamm.sim, 3/10) # for each simulation
 
 for (results in list(norm.results, pois.results, gamm.results)){
+  
   for (statistic in c('coverage','length','failure tendency')){
     
     # to avoid "the condition has length > 1" warnings, we compare the first
@@ -119,6 +140,11 @@ for (i in 1:3){
 }
 
 
+# Produce the plot which supports our claim that the BCa is better for low n:
+pois.sim2 %>% calculate.summaries(100) %>% plot(statistic='coverage',
+                                                main='Poisson data')
+
+
 
 
 
@@ -136,16 +162,3 @@ for (method in 1:4){
 
   }
 }
-
-### side analysis looking at BCa vs percentile for low n and high resamples ####
-pois.sim2 <- simulation(dist.func='rpois',
-                        simulations=simulations,
-                        sample.n=c(10,20,35,50),
-                        boot.n=c(2999,3499),
-                        boot.method=c('percentile','BCa'),
-                        stat.func=mean,
-                        lambda=100)
-
-# Produce the plot which supports our claim that the BCa is better for low n:
-pois.sim2 %>% calculate.summaries(100) %>% plot(statistic='coverage',
-                                                main='Poisson data')
