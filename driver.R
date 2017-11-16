@@ -97,30 +97,33 @@ Sys.time() %>% paste('was our end time') %>% print() # print the end time
 ### side analysis looking at BCa vs percentile for low n and high resamples ####
 
 
-set.seed(123454321) # This simulation was added after the main simulations were
-# done, so we set the seed again to ensure the below simulations always return
-# the same results
+set.seed(123454321) # Set the seed here again so we can run this chunk
+# independently more easily if we have to
 
 pois.sim2 <- simulation(dist.func='rpois',
-                        simulations=5*simulations,
-                        sample.n=c(20,35,50),
-                        boot.n=c(2999,3499),
+                        simulations=simulations/10,
+                        sample.n=c(50),
+                        boot.n=c(9999),
                         boot.method=c('percentile','BCa'),
                         stat.func=mean,
                         lambda=100)
-
+pois.sim2 %>% calculate.summaries(100) %>% plot(statistic='coverage',
+                                                main='Poisson data')
 
 gamm.sim2 <- simulation(dist.func='rgamma',
-                        simulations=5*simulations,
-                        sample.n=c(20,35,50),
+                        simulations=simulations,
+                        sample.n=c(20,50),
                         boot.n=c(2999,3499),
                         boot.method=c('percentile','BCa'),
                         stat.func=mean,
                         shape=3,
                         rate=10)
+gamm.sim2 %>% calculate.summaries(0.3) %>% plot(statistic='coverage',
+                                                main='Gamma data')
 
 
-if (!exists('pilot.sims')){
+if (!exists('pilot.sims')){ # No need to produce plots if this is a pilot:
+  
 ############## Producing plots to visualise the simulation results #############
 
   norm.results <- calculate.summaries(norm.sim, 0)    # calculate coverage, len
