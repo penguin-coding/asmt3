@@ -223,18 +223,19 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
     for (i in 1:n){samples[,i] <- do.call(dist.func,dist.func.args)}
   }
   
-  samples <- cbind(samples,data)                # add in the observed data
-  samples <- apply(samples,2,func)              # calculate statistics
+  samples <- cbind(samples,data)      # add in the observed data
+  stats <- apply(samples,2,func)      # calculate statistics
   lower <- alpha/2      # percentile method
   upper <- 1 - alpha/2  # intervals
   
   if (method=='BCa'){
-    alphas <- get.bca.alphas(data, func(data), samples, alpha, func)
+    alphas <- get.bca.alphas(data, func(data), stats, alpha, func)
     lower  <- alphas[1]
     upper  <- alphas[2]
     }
   
-  CI <- quantile(samples, probs=c(lower, upper))
+  CI <- quantile(stats, probs=c(lower, upper))
+
   return(CI)
 }
 

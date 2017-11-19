@@ -16,7 +16,7 @@ Sys.time() %>% paste('was our start time') %>% print() # print the start time
 
 sample.n <- c(50,100,500,1000)
 boot.n <- c(99,199,499,999)
-boot.method=c('percentile','BCa','parametric','smooth','par.fit')
+boot.method=c('percentile','BCa','smooth','par.fit')
 
 # The pilot study function goes through this code and times how long the file
 # takes to run for various values of 'simulations'. In order to do this, the 
@@ -101,7 +101,7 @@ set.seed(123454321) # Set the seed here again so we can run this chunk
 # independently more easily if we have to
 
 pois.sim2 <- simulation(dist.func='rpois',
-                        simulations=simulations/10,
+                        simulations=simulations,
                         sample.n=c(50),
                         boot.n=c(9999),
                         boot.method=c('percentile','BCa'),

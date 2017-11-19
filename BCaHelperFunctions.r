@@ -10,7 +10,7 @@ get.zhat0<-function(est,boot.est){
 # est - estimated quantity of interest from data
 # boot.est - vector of bootstrap estimates of quantity of interest
   
-  prop.less<-sum(boot.est<est)/length(boot.est)
+  prop.less<-sum(boot.est<=est)/length(boot.est)
   zhat<-qnorm(prop.less)
   return(zhat)
 }
@@ -42,7 +42,7 @@ get.ahat<-function(data,est,fun,...){
   #Compute ahat
   mean.jack.est<-mean(jack.est)
   ahat.numerator<- sum((mean.jack.est-jack.est)^3)
-  ahat.denominator<-6*(sum((mean.jack.est-jack.est)^2))^1.5
+  ahat.denominator<-6*((sum((mean.jack.est-jack.est)^2))^1.5)
   ahat<-ahat.numerator/ahat.denominator
   return(ahat)
 }
