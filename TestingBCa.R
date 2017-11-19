@@ -51,8 +51,8 @@ compare.BCAs <- function(sims, n, R, statfuncs){
 }
 
 set.seed(666)
-R <- c(999)
-N <- c(20)
+R <- c(999)    # set to any combination
+N <- c(20)     # of desired values
 sims <- 10000
 
 system.time(

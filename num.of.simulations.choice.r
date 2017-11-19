@@ -5,7 +5,7 @@
 ### predicted times, refer to the figure in the report for the specific
 ### graph this produced on my machine. 
 
-x <- seq(5)  # Setting this to 5 takes 2 minutes on my machine, but 3 is enough
+x <- seq(3)  # Setting this to 5 takes 2 minutes on my machine, but 3 is enough
 y <- rep(NA, length(x))
 
 for (j in x){

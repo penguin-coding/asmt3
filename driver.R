@@ -14,7 +14,7 @@ set.seed(12**3*4**5)  # to make results reproducible to the reader
 
 Sys.time() %>% paste('was our start time') %>% print() # print the start time
 
-sample.n <- c(50,100,500)
+sample.n <- c(20,50,100,500)
 boot.n <- c(999,1999,4999)
 boot.method=c('percentile','BCa','smooth','par.fit')
 

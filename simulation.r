@@ -7,21 +7,24 @@ library(reshape2)              # Used by the sim.plot.3D function
 library(rgl)                   # Used by the sim.plot.3D function
 library(magrittr) # ceci n'est pas une pipe, hon hon hon
 
-non.parametric.sample <- function(data, n){
+non.parametric.sample <- function(data, n, check.inputs=F){
   # purpose : produces n random samples of size length(data) from the supplied
-  #           data
+  #           data, and returns the statistic of interest for each sample
   #
   # inputs  : data - numeric vector of univariate observations
   #           n    - positive integer number of samples to be drawn
   #
   # output  : length(data)*n dimension matrix. Each column is a generated sample
   
-  if (class(data)!='numeric' & class(data)!='integer'){
-    stop('input data must be numeric')}
+  if (check.inputs){ # optional input checks
+    
+    if (class(data)!='numeric' & class(data)!='integer'){
+      stop('input data must be numeric')}
   
-  if (n%%1!=0 | n<1) stop('n must be a positive integer')
+    if (n%%1!=0 | n<1) stop('n must be a positive integer')
+  }
   
-  return(replicate(n, sample(x=data, size=length(data),replace=T)))
+  return(data %>% sample(length(data)*n, replace=T) %>% matrix(ncol=n) )
 }
 
 get.bca.alphas <- function(data, est, boot.est, alpha, func){
@@ -169,6 +172,8 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
     dist.func <- match.fun(dist.func) # the name of dist.func
   }
   
+  ldata <- length(data)
+  
   # If the user has set smooth.sd to 0 and wants a smooth bootstrap, we obtain
   # the same result more efficiently by simply providing them with a percentile
   # bootstrap:
@@ -176,12 +181,11 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   
   if (method!='parametric' & method!='par.fit'){
     
-    # generate the random samples with replacement:
-    samples <- replicate(n, sample(x=data, size=length(data),replace=T)) 
+    # generate the bootstrap resamples:
+    samples <- non.parametric.sample(data, n)
     
     if (method=='smooth'){ # add noise to the data for a smooth bootstrap
-      noise <- replicate(n, rnorm(length(data), sd = sd(data)*smooth.sd))
-      samples <- samples + noise
+      samples <- samples + matrix(data=rnorm(ldata*n), nrow=ldata, ncol=n)
     }
     
   }
@@ -195,36 +199,40 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
                                
                                # if the data are normal, this is easy using
                                # sample statistics
-                               rnorm=list(n=length(data),mean=mean(data),
-                                          sd=sd(data)),
+                               rnorm=list(n=ldata,mean=mean(data),sd=sd(data)),
                                
                                # same goes for poisson data
-                               rpois=list(n=length(data),lambda=mean(data)),
+                               rpois=list(n=ldata, lambda=mean(data)),
                                
                                # if the data are gamma, we need to call an MLE
                                # function to get the estimates, and extract
                                # initial guesses from the ones passed by the
                                # user using ... arguments. 
-                               rgamma=as.list(c(n=length(data),gammaMLE(
+                               rgamma=as.list(c(n=ldata, gammaMLE(
                                  log(c(list(...)$rate,list(...)$shape)),data))))
       
-      # Note, we add in n=length(data) to the list of estimated parameters so
+      # Note, we add in n=ldata to the list of estimated parameters so
       # that the use of do.call() becomes possible
     }
     
     # If method=='parametric' we simply use the true parameter values as the 
     # ones we pass to dist.func:
-    else {dist.func.args <- as.list(c(n=length(data),list(...)))}
+    else {dist.func.args <- as.list(c(n=ldata,list(...)))}
     
-    samples <- matrix(nrow=length(data),ncol=n)
+    samples <- matrix(nrow=ldata,ncol=n)
     
     # the replicate function worked badly with functions like rpois and rt, 
     # so a less efficient method has to be used to produce parametric samples:
     for (i in 1:n){samples[,i] <- do.call(dist.func,dist.func.args)}
   }
   
-  samples <- cbind(samples,data)      # add in the observed data
-  stats <- apply(samples,2,func)      # calculate statistics
+  stats <- rep(NA, n)             # some profiling revealed a for loop was 
+  for (i in 1:n){                 # in fact far faster than using the
+    stats[i] <- mean(samples[,i]) # apply function
+  }
+  
+  #stats <- apply(samples,2,func)  # calculate statistics
+  stats <- c(stats, func(data))    # add in O.G data
   lower <- alpha/2      # percentile method
   upper <- 1 - alpha/2  # intervals
   
@@ -235,6 +243,7 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
     }
   
   CI <- quantile(stats, probs=c(lower, upper))
+  names(CI) <- c('lower','upper')
 
   return(CI)
 }
