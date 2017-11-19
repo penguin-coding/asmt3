@@ -10,19 +10,19 @@ set.seed(12**3*4**5)  # to make results reproducible to the reader
 
 # This simulation takes a long time to run - roughly 2 hours on a 4.0 GHz
 # processor. The global environment produced by this file is made
-# available in the project zip file as 'SimGlobalEnv.r'.
+# available in the project zip file as 'SimGlobalEnv8.r'.
 
 Sys.time() %>% paste('was our start time') %>% print() # print the start time
 
-sample.n <- c(50,100,500,1000)
-boot.n <- c(99,199,499,999)
+sample.n <- c(50,100,500)
+boot.n <- c(999,1999,4999)
 boot.method=c('percentile','BCa','smooth','par.fit')
 
-# The pilot study function goes through this code and times how long the file
+# The pilot study file goes through this code and times how long this file
 # takes to run for various values of 'simulations'. In order to do this, the 
 # pilot file will set a variable pilot.sims, we check if this variable exists
 # (which indicates that this file is being sourced from the pilot file), and if
-# it does we use the hardcoded value, otherwise, we use the one specified 
+# it doesn't we use the hardcoded value, otherwise, we use the one specified 
 # by the pilot file
 ifelse(exists('pilot.sims'), simulations <- pilot.sims, simulations <- 1000)
 
@@ -97,29 +97,27 @@ Sys.time() %>% paste('was our end time') %>% print() # print the end time
 ### side analysis looking at BCa vs percentile for low n and high resamples ####
 
 
-set.seed(123454321) # Set the seed here again so we can run this chunk
-# independently more easily if we have to
+# set.seed(123454321) # Set the seed here again so we can run this chunk
+# # independently more easily if we have to
+# 
+# pois.sim2 <- simulation(dist.func='rpois',
+#                         simulations=simulations,
+#                         sample.n=c(20,50),
+#                         boot.n=c(2999,3499),
+#                         boot.method=c('percentile','BCa'),
+#                         stat.func=mean,
+#                         lambda=100)
+# 
+# 
+# gamm.sim2 <- simulation(dist.func='rgamma',
+#                         simulations=simulations,
+#                         sample.n=c(20,50),
+#                         boot.n=c(2999,3499),
+#                         boot.method=c('percentile','BCa'),
+#                         stat.func=mean,
+#                         shape=3,
+#                         rate=10)
 
-pois.sim2 <- simulation(dist.func='rpois',
-                        simulations=simulations,
-                        sample.n=c(50),
-                        boot.n=c(9999),
-                        boot.method=c('percentile','BCa'),
-                        stat.func=mean,
-                        lambda=100)
-pois.sim2 %>% calculate.summaries(100) %>% plot(statistic='coverage',
-                                                main='Poisson data')
-
-gamm.sim2 <- simulation(dist.func='rgamma',
-                        simulations=simulations,
-                        sample.n=c(20,50),
-                        boot.n=c(2999,3499),
-                        boot.method=c('percentile','BCa'),
-                        stat.func=mean,
-                        shape=3,
-                        rate=10)
-gamm.sim2 %>% calculate.summaries(0.3) %>% plot(statistic='coverage',
-                                                main='Gamma data')
 
 
 if (!exists('pilot.sims')){ # No need to produce plots if this is a pilot:
@@ -166,15 +164,15 @@ if (!exists('pilot.sims')){ # No need to produce plots if this is a pilot:
   }
 
 
-  for (statistic in c('coverage','length','failure tendency')){
-    # Produce the plot which supports our claim that the BCa is better for low n:
-    pois.sim2 %>% calculate.summaries(100) %>% plot(statistic=statistic,
-                                                    main='Poisson data')
-  
-    gamm.sim2 %>% calculate.summaries(3/10) %>% plot(statistic=statistic,
-                                                     main='Gamma data')
-
-  }
+  # for (statistic in c('coverage','length','failure tendency')){
+  #   # Produce the plot which supports our claim that the BCa is better for low n:
+  #   pois.sim2 %>% calculate.summaries(100) %>% plot(statistic=statistic,
+  #                                                   main='Poisson data')
+  # 
+  #   gamm.sim2 %>% calculate.summaries(3/10) %>% plot(statistic=statistic,
+  #                                                    main='Gamma data')
+  # 
+  # }
 
 
 ################ Create some 3D plots for the standard analyses ################
