@@ -71,10 +71,13 @@ gamm.sim <- simulation(dist.func='rgamma',
 # We can't vary the proportion of the variance of the smoothing terms
 # with respect to the observed data using the simulation function, so 
 # we manually produce a small simulation dataset for analysis:
-smooth.sd <- seq(0.01,0.33,length=20)            # set our chosen values
+smooth.sd <- seq(0.01,0.33,length=10)            # set our chosen values
 smoot.sim <- as.list(rep(NA, length(smooth.sd))) # object to store outputs
 
+
+set.seed(1234567)
 counter = 0
+
 for (i in smooth.sd){
   counter = counter + 1
   sim <- simulation(dist.func=rnorm,
@@ -86,39 +89,8 @@ for (i in smooth.sd){
                     smooth.sd=smooth.sd[counter])
   smoot.sim[[counter]] <- sim[1,1,1,]
 }
-remove(i) ; remove(counter) # remove unnecessary global vars
 
 Sys.time() %>% paste('was our end time') %>% print() # print the end time
-
-
-
-
-
-### side analysis looking at BCa vs percentile for low n and high resamples ####
-
-
-# set.seed(123454321) # Set the seed here again so we can run this chunk
-# # independently more easily if we have to
-# 
-# pois.sim2 <- simulation(dist.func='rpois',
-#                         simulations=simulations,
-#                         sample.n=c(20,50),
-#                         boot.n=c(2999,3499),
-#                         boot.method=c('percentile','BCa'),
-#                         stat.func=mean,
-#                         lambda=100)
-# 
-# 
-# gamm.sim2 <- simulation(dist.func='rgamma',
-#                         simulations=simulations,
-#                         sample.n=c(20,50),
-#                         boot.n=c(2999,3499),
-#                         boot.method=c('percentile','BCa'),
-#                         stat.func=mean,
-#                         shape=3,
-#                         rate=10)
-
-
 
 if (!exists('pilot.sims')){ # No need to produce plots if this is a pilot:
   
@@ -140,7 +112,7 @@ if (!exists('pilot.sims')){ # No need to produce plots if this is a pilot:
     
       main <- paste(main, 'simulated deviates')
     
-      plot(results, statistic=statistic, main=main)
+      plot(results, statistic=statistic, fix.to.top=F, main=main)
     }
   }
 

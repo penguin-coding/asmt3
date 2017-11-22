@@ -10,7 +10,7 @@ get.zhat0<-function(est,boot.est){
 # est - estimated quantity of interest from data
 # boot.est - vector of bootstrap estimates of quantity of interest
   
-  prop.less<-sum(boot.est<=est)/length(boot.est)
+  prop.less<-sum(boot.est<est)/length(boot.est)
   zhat<-qnorm(prop.less)
   return(zhat)
 }

@@ -185,7 +185,8 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
     samples <- non.parametric.sample(data, n)
     
     if (method=='smooth'){ # add noise to the data for a smooth bootstrap
-      samples <- samples + matrix(data=rnorm(ldata*n), nrow=ldata, ncol=n)
+      samples <- samples + matrix(data=rnorm(ldata*n, sd=sd(data)*smooth.sd), 
+                                  nrow=ldata, ncol=n)
     }
     
   }
@@ -228,11 +229,10 @@ bootstrap <- function(data, n=999, alpha = 0.05, func = mean,
   
   stats <- rep(NA, n)             # some profiling revealed a for loop was 
   for (i in 1:n){                 # in fact far faster than using the
-    stats[i] <- mean(samples[,i]) # apply function
+    stats[i] <- func(samples[,i]) # apply function to calculate the statistics
   }
   
-  #stats <- apply(samples,2,func)  # calculate statistics
-  stats <- c(stats, func(data))    # add in O.G data
+  stats <- c(stats, func(data))    # add in O.G data statistic
   lower <- alpha/2      # percentile method
   upper <- 1 - alpha/2  # intervals
   
@@ -429,7 +429,8 @@ get.length <- function(bootstrap.results){
 }
 
 plot.simulation.summary.object <- function(simulation.summary.object,
-                                           statistic='coverage',...){
+                                           statistic='coverage',fix.to.top=F,
+                                           ...){
   # purpose : plots the statistic of interest for a set of simulation
   #           bootstrap confidence intervals, for all levels of 'factor'. Fixes
   #           the other setting values at their highest setting i.e. uses the 
@@ -440,6 +441,11 @@ plot.simulation.summary.object <- function(simulation.summary.object,
   #           statistic                 - summary statistic of interest, 
   #                                       'coverage', 'length','failure
   #                                       tendency'
+  #           fix.to.top                - if FALSE, we average over the dimension
+  #                                       not being plotted (either sample size
+  #                                       or bootstrap resamples). If TRUE,
+  #                                       we fix that dimension to its highest 
+  #                                       value instead
   #           ...                       - extra optional parameters to be 
   #                                       passed to matplot
   # output  : None, produces a plot. 
@@ -469,8 +475,16 @@ plot.simulation.summary.object <- function(simulation.summary.object,
                          dimnames(simulation.summary.object)[[plot.num]]))
       
     # extract statistic values and average over index not being plotted:
-    y <- apply(simulation.summary.object[,,,stat.ind], c(plot.num,3), mean)
-      
+    
+    if (!fix.to.top){ # either we average over the other dimension
+      y <- apply(simulation.summary.object[,,,stat.ind], c(plot.num,3), mean)
+    }
+    
+    else{           
+      ifelse(plot.num==1,  #... or we fix it at its highest value
+             y <- simulation.summary.object[,dims[2],,stat.ind],
+             y <- simulation.summary.object[dims[1],,,stat.ind])
+    }
     xlab = c('sample size','bootstrap resamples')[plot.num]
   
     # Draw the plot:
