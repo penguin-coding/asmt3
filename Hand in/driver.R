@@ -127,39 +127,24 @@ if (!exists('pilot.sims')){ # No need to produce plots if this is a pilot:
 
 
   # We manually produce some plots for the smooth bootstrap analysis:
-  for (i in 1:3){
-    ylab <-  switch(i, '1'='coverage', '2'='length', '3'='failure tendency')
-    main <- 'Smooth bootstrap'
-    y <- smooth.stats[,i]
-    plot(smooth.sd, y,xlab = 'smooth.sd', ylab=ylab, main=main,
-         col=4)
-  }
 
-
-  # for (statistic in c('coverage','length','failure tendency')){
-  #   # Produce the plot which supports our claim that the BCa is better for low n:
-  #   pois.sim2 %>% calculate.summaries(100) %>% plot(statistic=statistic,
-  #                                                   main='Poisson data')
-  # 
-  #   gamm.sim2 %>% calculate.summaries(3/10) %>% plot(statistic=statistic,
-  #                                                    main='Gamma data')
-  # 
-  # }
-
+  plot(smooth.sd, smooth.stats[,1],xlab = 'smooth.sd', ylab='covergae',
+       main='Smooth bootstrap',col=3, type='l')
+  
+  matplot(smooth.sd, smooth.stats[,2:3], type='l')
+  
+  legend('topright',c('length','failure tendency'),
+         lty=1,bty='n',cex=.75,col=seq(2))
 
 ################ Create some 3D plots for the standard analyses ################
 
   for (method in 1:4){
-    for (statistic in c('coverage')){
+    for (hist in c(T,F)){
 
-      # Because parametric bootstraps have a coverage of 1 in these simulations,
-      # the failure tendency is NaN, since there are no failures. Hence we skip
-      # this case to avoid errors with plot.sim.3D:
-      if (statistic!='length' & method==3) next
-
-      sim.plot.3D(norm.results, statistic=statistic, method=method, hist=F)
-
+      sim.plot.3D(gamm.results, statistic='coverage',
+                  method=method, hist=hist)
     }
   }
-
 }
+
+sim.plot.3D(pois.results, statistic='length', method=1, hist=F)
